@@ -4,6 +4,12 @@ const APIFY_TOKEN = import.meta.env.VITE_APIFY_TOKEN;
 const ACTOR_ID = "apify~instagram-followers-count-scraper";
 const APIFY_BASE = "https://api.apify.com/v2";
 
+function checkToken() {
+  if (!APIFY_TOKEN) {
+    throw new Error("Apify API Token is missing. Please set VITE_APIFY_TOKEN in your environment variables.");
+  }
+}
+
 export function parseUsername(input: string): string {
   const trimmed = input.trim();
   const urlMatch = trimmed.match(/(?:https?:\/\/)?(?:www\.)?instagram\.com\/([A-Za-z0-9._]+)\/?/);
@@ -60,6 +66,7 @@ function mapItem(item: Record<string, unknown>, fallbackUsername = ""): Instagra
 }
 
 export async function fetchProfile(input: string): Promise<InstagramProfile> {
+  checkToken();
   const username = parseUsername(input);
   if (!username) throw new Error("Please enter a valid username or profile URL.");
   if (!/^[A-Za-z0-9._]{1,30}$/.test(username))
@@ -89,6 +96,7 @@ export async function fetchProfile(input: string): Promise<InstagramProfile> {
 }
 
 export async function fetchProfilesBulk(inputs: string[]): Promise<InstagramProfile[]> {
+  checkToken();
   const usernames = inputs.map(parseUsername).filter(Boolean);
   if (usernames.length === 0) throw new Error("No valid usernames provided.");
 
