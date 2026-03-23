@@ -62,7 +62,7 @@ function Main() {
   const [searchInput, setSearchInput] = useState<string | null>(null);
   const [bulkRaw, setBulkRaw] = useState("");
   const [bulkInputs, setBulkInputs] = useState<string[] | null>(null);
-  const [sortKey, setSortKey] = useState<keyof InstagramProfile>("followers");
+  const [sortKey, setSortKey] = useState<keyof InstagramProfile | 'original' | 'diff'>("original");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [sheetData, setSheetData] = useState<Record<string, number>>({});
   const [sheetRaw, setSheetRaw] = useState<SheetData[]>([]);
@@ -87,15 +87,32 @@ function Main() {
 
   const sortedBulk = useMemo(() => {
     if (!bulkProfiles) return [];
+    if (sortKey === 'original') {
+      const inputOrder = (bulkInputs || []).map(parseUsername);
+      return [...bulkProfiles].sort((a, b) => {
+        const idxA = inputOrder.indexOf(a.username.toLowerCase());
+        const idxB = inputOrder.indexOf(b.username.toLowerCase());
+        if (idxA === -1) return 1;
+        if (idxB === -1) return -1;
+        return idxA - idxB;
+      });
+    }
+    if (sortKey === 'diff') {
+      return [...bulkProfiles].sort((a, b) => {
+        const diffA = a.followers - (sheetData[a.username.toLowerCase()] || 0);
+        const diffB = b.followers - (sheetData[b.username.toLowerCase()] || 0);
+        return sortDir === 'asc' ? diffA - diffB : diffB - diffA;
+      });
+    }
     return [...bulkProfiles].sort((a, b) => {
-      const av = a[sortKey];
-      const bv = b[sortKey];
+      const av = a[sortKey as keyof InstagramProfile];
+      const bv = b[sortKey as keyof InstagramProfile];
       if (typeof av === 'number' && typeof bv === 'number') {
         return sortDir === 'asc' ? av - bv : bv - av;
       }
       return 0;
     });
-  }, [bulkProfiles, sortKey, sortDir]);
+  }, [bulkProfiles, sortKey, sortDir, bulkInputs, sheetData]);
 
   const handleSearch = (e: FormEvent) => {
     e.preventDefault();
@@ -109,7 +126,7 @@ function Main() {
     const p = bulkRaw.split(/[\n,]+/).map(s => s.trim()).filter(Boolean);
     if (p.length) {
       setBulkInputs(p);
-      setSheetData({}); // Clear sheet data if manual bulk
+      // Removed setSheetData({}) to allow comparison
     }
   };
 
@@ -434,7 +451,17 @@ function Main() {
                     <table className="w-full text-left border-collapse">
                       <thead>
                         <tr className="bg-slate-50 border-b border-slate-200">
-                          <th className="p-4 text-[10px] font-bold uppercase tracking-widest text-slate-500">Profile</th>
+                          <th 
+                            className="p-4 text-[10px] font-bold uppercase tracking-widest text-slate-500 cursor-pointer hover:text-slate-900 transition-colors"
+                            onClick={() => {
+                              if (sortKey === 'original') setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+                              else { setSortKey('original'); setSortDir('asc'); }
+                            }}
+                          >
+                            <div className="flex items-center gap-1">
+                              Profile {sortKey === 'original' && (sortDir === 'asc' ? <ArrowUp size={10} /> : <ArrowDown size={10} />)}
+                            </div>
+                          </th>
                           <th 
                             className="p-4 text-[10px] font-bold uppercase tracking-widest text-slate-500 cursor-pointer hover:text-slate-900 transition-colors"
                             onClick={() => {
@@ -449,7 +476,17 @@ function Main() {
                           {Object.keys(sheetData).length > 0 && (
                             <>
                               <th className="p-4 text-[10px] font-bold uppercase tracking-widest text-slate-500">Sheet Followers</th>
-                              <th className="p-4 text-[10px] font-bold uppercase tracking-widest text-slate-500">Difference</th>
+                              <th 
+                                className="p-4 text-[10px] font-bold uppercase tracking-widest text-slate-500 cursor-pointer hover:text-slate-900 transition-colors"
+                                onClick={() => {
+                                  if (sortKey === 'diff') setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+                                  else { setSortKey('diff'); setSortDir('desc'); }
+                                }}
+                              >
+                                <div className="flex items-center gap-1">
+                                  Difference {sortKey === 'diff' && (sortDir === 'asc' ? <ArrowUp size={10} /> : <ArrowDown size={10} />)}
+                                </div>
+                              </th>
                             </>
                           )}
                         </tr>
