@@ -3,12 +3,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useMemo, type FormEvent } from 'react';
+import React, { useState, useMemo, type FormEvent } from 'react';
 import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
 import { 
   Instagram, Search, Loader2, AlertCircle, Users, List, 
   BadgeCheck, Lock, ExternalLink, ArrowUpDown, ArrowUp, ArrowDown, 
-  X, ChevronRight
+  X, ChevronRight, Copy
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { clsx, type ClassValue } from 'clsx';
@@ -144,7 +144,11 @@ function Main() {
   const copySheetUrls = () => {
     const urls = sheetRaw.map(d => d.url || d.username).filter(Boolean).join("\n");
     navigator.clipboard.writeText(urls);
-    // Optional: add a toast notification
+  };
+
+  const copySheetFollowers = () => {
+    const followers = sheetRaw.map(d => d.followers).join("\n");
+    navigator.clipboard.writeText(followers);
   };
 
   const populateBulkInput = () => {
@@ -246,21 +250,46 @@ function Main() {
                   <X size={20} />
                 </button>
               </div>
-              <p className="text-sm text-slate-600 mb-6">
-                Found {sheetRaw.length} profiles in the sheet. You can either copy the URLs or populate the bulk lookup input directly.
+              <p className="text-sm text-slate-600 mb-4">
+                Found {sheetRaw.length} profiles in the sheet.
               </p>
-              <div className="flex gap-3">
+              
+              <div className="max-h-40 overflow-y-auto mb-6 p-3 bg-white/50 rounded-xl border border-slate-200">
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Profile</div>
+                  <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider text-right">Followers</div>
+                  {sheetRaw.slice(0, 50).map((item, i) => (
+                    <React.Fragment key={i}>
+                      <div className="text-xs text-slate-700 truncate">{item.username || parseUsername(item.url) || "Unknown"}</div>
+                      <div className="text-xs font-mono text-cyan-700 text-right">{item.followers.toLocaleString()}</div>
+                    </React.Fragment>
+                  ))}
+                  {sheetRaw.length > 50 && (
+                    <div className="col-span-2 text-[10px] text-center text-slate-400 pt-2 border-t border-slate-100">
+                      + {sheetRaw.length - 50} more profiles
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <button 
                   onClick={populateBulkInput}
-                  className="flex-1 py-3 bg-cyan-600 text-white font-bold rounded-xl hover:bg-cyan-700 transition-all flex items-center justify-center gap-2"
+                  className="py-3 bg-cyan-600 text-white font-bold rounded-xl hover:bg-cyan-700 transition-all flex items-center justify-center gap-2"
                 >
                   <List size={16} /> Populate Bulk Input
                 </button>
                 <button 
                   onClick={copySheetUrls}
-                  className="px-6 py-3 bg-white border border-slate-200 text-slate-700 font-bold rounded-xl hover:bg-slate-50 transition-all flex items-center justify-center gap-2"
+                  className="py-3 bg-white border border-slate-200 text-slate-700 font-bold rounded-xl hover:bg-slate-50 transition-all flex items-center justify-center gap-2"
                 >
                   <ExternalLink size={16} /> Copy URLs
+                </button>
+                <button 
+                  onClick={copySheetFollowers}
+                  className="sm:col-span-2 py-3 bg-slate-800 text-white font-bold rounded-xl hover:bg-slate-900 transition-all flex items-center justify-center gap-2"
+                >
+                  <Copy size={16} /> Copy Follower Counts
                 </button>
               </div>
             </motion.div>
