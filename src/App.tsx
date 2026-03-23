@@ -3,11 +3,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useMemo, type FormEvent } from 'react';
+import { useState, useMemo, type FormEvent } from 'react';
 import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
 import { 
   Instagram, Search, Loader2, AlertCircle, Users, List, 
-  BadgeCheck, Lock, ExternalLink, ArrowUp, ArrowDown, X
+  BadgeCheck, Lock, ExternalLink, ArrowUpDown, ArrowUp, ArrowDown, 
+  X, ChevronRight
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { clsx, type ClassValue } from 'clsx';
@@ -60,7 +61,7 @@ function Main() {
   const [searchInput, setSearchInput] = useState<string | null>(null);
   const [bulkRaw, setBulkRaw] = useState("");
   const [bulkInputs, setBulkInputs] = useState<string[] | null>(null);
-  const [sortKey, setSortKey] = useState<keyof InstagramProfile | 'original'>("original");
+  const [sortKey, setSortKey] = useState<keyof InstagramProfile>("followers");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
 
   // Queries
@@ -79,31 +80,16 @@ function Main() {
   });
 
   const sortedBulk = useMemo(() => {
-    if (!bulkProfiles || !bulkInputs) return [];
-    
-    const profileMap = new Map(bulkProfiles.map(p => [p.username.toLowerCase(), p]));
-    
-    const results = bulkInputs.map(input => {
-      const username = parseUsername(input);
-      return {
-        input,
-        profile: profileMap.get(username) || null
-      };
-    });
-
-    if (sortKey === 'original') {
-      return sortDir === 'asc' ? results : [...results].reverse();
-    }
-
-    return [...results].sort((a, b) => {
-      const av = a.profile ? a.profile[sortKey as keyof InstagramProfile] : 0;
-      const bv = b.profile ? b.profile[sortKey as keyof InstagramProfile] : 0;
+    if (!bulkProfiles) return [];
+    return [...bulkProfiles].sort((a, b) => {
+      const av = a[sortKey];
+      const bv = b[sortKey];
       if (typeof av === 'number' && typeof bv === 'number') {
         return sortDir === 'asc' ? av - bv : bv - av;
       }
       return 0;
     });
-  }, [bulkProfiles, sortKey, sortDir, bulkInputs]);
+  }, [bulkProfiles, sortKey, sortDir]);
 
   const handleSearch = (e: FormEvent) => {
     e.preventDefault();
@@ -115,9 +101,7 @@ function Main() {
   const handleBulkSubmit = (e: FormEvent) => {
     e.preventDefault();
     const p = bulkRaw.split(/[\n,]+/).map(s => s.trim()).filter(Boolean);
-    if (p.length) {
-      setBulkInputs(p);
-    }
+    if (p.length) setBulkInputs(p);
   };
 
   return (
@@ -298,14 +282,6 @@ function Main() {
               )}
 
               {bulkProfiles && (
-                <div className="flex items-center justify-between px-2">
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
-                    Found {bulkProfiles.length} profiles for {bulkInputs?.length} inputs
-                  </p>
-                </div>
-              )}
-
-              {bulkProfiles && (
                 <motion.div 
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
@@ -315,17 +291,7 @@ function Main() {
                     <table className="w-full text-left border-collapse">
                       <thead>
                         <tr className="bg-slate-50 border-b border-slate-200">
-                          <th 
-                            className="p-4 text-[10px] font-bold uppercase tracking-widest text-slate-500 cursor-pointer hover:text-slate-900 transition-colors"
-                            onClick={() => {
-                              if (sortKey === 'original') setSortDir(d => d === 'asc' ? 'desc' : 'asc');
-                              else { setSortKey('original'); setSortDir('asc'); }
-                            }}
-                          >
-                            <div className="flex items-center gap-1">
-                              Input Entered {sortKey === 'original' && (sortDir === 'asc' ? <ArrowUp size={10} /> : <ArrowDown size={10} />)}
-                            </div>
-                          </th>
+                          <th className="p-4 text-[10px] font-bold uppercase tracking-widest text-slate-500">Profile</th>
                           <th 
                             className="p-4 text-[10px] font-bold uppercase tracking-widest text-slate-500 cursor-pointer hover:text-slate-900 transition-colors"
                             onClick={() => {
@@ -340,30 +306,23 @@ function Main() {
                         </tr>
                       </thead>
                       <tbody>
-                        {sortedBulk.map((item, i) => {
-                           const { input, profile: p } = item;
-                           return (
-                            <tr key={input + i} className="border-t border-slate-100 hover:bg-slate-50 transition-colors group">
-                              <td className="p-4">
-                                <div className="flex items-center gap-3">
-                                  {p ? (
-                                    <img src={p.profilePic} className="w-8 h-8 rounded-full border border-slate-200" alt="" />
-                                  ) : (
-                                    <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-400">
-                                      <Instagram size={14} />
-                                    </div>
-                                  )}
-                                  <span className="text-xs font-mono text-slate-600 truncate max-w-[250px]">
-                                    {input}
-                                  </span>
+                        {sortedBulk.map((p, i) => (
+                          <tr key={p.username} className="border-t border-slate-100 hover:bg-slate-50 transition-colors group">
+                            <td className="p-4">
+                              <div className="flex items-center gap-3">
+                                <img src={p.profilePic} className="w-10 h-10 rounded-full border border-slate-200" alt="" />
+                                <div>
+                                  <div className="flex items-center gap-1">
+                                    <span className="text-sm font-bold text-slate-900">{p.displayName}</span>
+                                    {p.isVerified && <BadgeCheck size={12} className="text-blue-500" />}
+                                  </div>
+                                  <span className="text-xs text-slate-500">@{p.username}</span>
                                 </div>
-                              </td>
-                              <td className="p-4 font-display font-bold text-slate-900">
-                                {p ? formatCount(p.followers) : "—"}
-                              </td>
-                            </tr>
-                          );
-                        })}
+                              </div>
+                            </td>
+                            <td className="p-4 font-display font-bold text-cyan-600">{formatCount(p.followers)}</td>
+                          </tr>
+                        ))}
                       </tbody>
                     </table>
                   </div>
