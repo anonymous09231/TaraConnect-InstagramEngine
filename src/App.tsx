@@ -79,25 +79,33 @@ function Main() {
   });
 
   const sortedBulk = useMemo(() => {
-    if (!bulkProfiles) return [];
+    if (!bulkProfiles || !bulkInputs) return [];
+    
+    // Map inputs to their fetched profiles
+    const results = bulkInputs.map(input => {
+      const username = parseUsername(input);
+      const profile = bulkProfiles.find(p => p.username.toLowerCase() === username);
+      return { input, profile };
+    });
+
     if (sortKey === 'original') {
-      const inputOrder = (bulkInputs || []).map(parseUsername);
-      return [...bulkProfiles].sort((a, b) => {
-        const idxA = inputOrder.indexOf(a.username.toLowerCase());
-        const idxB = inputOrder.indexOf(b.username.toLowerCase());
-        if (idxA === -1) return 1;
-        if (idxB === -1) return -1;
-        return idxA - idxB;
-      });
+      return sortDir === 'asc' ? results : [...results].reverse();
     }
-    return [...bulkProfiles].sort((a, b) => {
-      const av = a[sortKey as keyof InstagramProfile];
-      const bv = b[sortKey as keyof InstagramProfile];
+
+    // For other sorting, we sort the ones that have profiles
+    const withProfiles = results.filter(r => r.profile);
+    const withoutProfiles = results.filter(r => !r.profile);
+
+    const sortedWith = [...withProfiles].sort((a, b) => {
+      const av = a.profile![sortKey as keyof InstagramProfile];
+      const bv = b.profile![sortKey as keyof InstagramProfile];
       if (typeof av === 'number' && typeof bv === 'number') {
         return sortDir === 'asc' ? av - bv : bv - av;
       }
       return 0;
     });
+
+    return [...sortedWith, ...withoutProfiles];
   }, [bulkProfiles, sortKey, sortDir, bulkInputs]);
 
   const handleSearch = (e: FormEvent) => {
@@ -302,6 +310,9 @@ function Main() {
                     <table className="w-full text-left border-collapse">
                       <thead>
                         <tr className="bg-slate-50 border-b border-slate-200">
+                          <th className="p-4 text-[10px] font-bold uppercase tracking-widest text-slate-500">
+                            Input
+                          </th>
                           <th 
                             className="p-4 text-[10px] font-bold uppercase tracking-widest text-slate-500 cursor-pointer hover:text-slate-900 transition-colors"
                             onClick={() => {
@@ -327,23 +338,33 @@ function Main() {
                         </tr>
                       </thead>
                       <tbody>
-                        {sortedBulk.map((p, i) => {
+                        {sortedBulk.map((item, i) => {
+                           const { input, profile: p } = item;
                            return (
-                            <tr key={p.username} className="border-t border-slate-100 hover:bg-slate-50 transition-colors group">
-                              <td className="p-4">
-                                <div className="flex items-center gap-3">
-                                  <img src={p.profilePic} className="w-8 h-8 rounded-full border border-slate-200" alt="" />
-                                  <a 
-                                    href={`https://instagram.com/${p.username}`} 
-                                    target="_blank" 
-                                    rel="noopener noreferrer"
-                                    className="text-xs font-mono text-cyan-600 hover:underline truncate max-w-[200px]"
-                                  >
-                                    instagram.com/{p.username}
-                                  </a>
-                                </div>
+                            <tr key={`${input}-${i}`} className="border-t border-slate-100 hover:bg-slate-50 transition-colors group">
+                              <td className="p-4 text-xs font-mono text-slate-500 truncate max-w-[150px]">
+                                {input}
                               </td>
-                              <td className="p-4 font-display font-bold text-slate-900">{formatCount(p.followers)}</td>
+                              <td className="p-4">
+                                {p ? (
+                                  <div className="flex items-center gap-3">
+                                    <img src={p.profilePic} className="w-8 h-8 rounded-full border border-slate-200" alt="" />
+                                    <a 
+                                      href={`https://instagram.com/${p.username}`} 
+                                      target="_blank" 
+                                      rel="noopener noreferrer"
+                                      className="text-xs font-mono text-cyan-600 hover:underline truncate max-w-[200px]"
+                                    >
+                                      instagram.com/{p.username}
+                                    </a>
+                                  </div>
+                                ) : (
+                                  <span className="text-xs text-slate-400 italic">Not Found</span>
+                                )}
+                              </td>
+                              <td className="p-4 font-display font-bold text-slate-900">
+                                {p ? formatCount(p.followers) : "-"}
+                              </td>
                             </tr>
                           );
                         })}
