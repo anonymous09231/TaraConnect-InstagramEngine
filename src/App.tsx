@@ -459,7 +459,7 @@ function Main() {
                             }}
                           >
                             <div className="flex items-center gap-1">
-                              Profile {sortKey === 'original' && (sortDir === 'asc' ? <ArrowUp size={10} /> : <ArrowDown size={10} />)}
+                              Profile URL {sortKey === 'original' && (sortDir === 'asc' ? <ArrowUp size={10} /> : <ArrowDown size={10} />)}
                             </div>
                           </th>
                           <th 
@@ -470,7 +470,7 @@ function Main() {
                             }}
                           >
                             <div className="flex items-center gap-1">
-                              Live Followers {sortKey === 'followers' && (sortDir === 'asc' ? <ArrowUp size={10} /> : <ArrowDown size={10} />)}
+                              Realtime Followers {sortKey === 'followers' && (sortDir === 'asc' ? <ArrowUp size={10} /> : <ArrowDown size={10} />)}
                             </div>
                           </th>
                           {Object.keys(sheetData).length > 0 && (
@@ -484,7 +484,7 @@ function Main() {
                                 }}
                               >
                                 <div className="flex items-center gap-1">
-                                  Difference {sortKey === 'diff' && (sortDir === 'asc' ? <ArrowUp size={10} /> : <ArrowDown size={10} />)}
+                                  Diff {sortKey === 'diff' && (sortDir === 'asc' ? <ArrowUp size={10} /> : <ArrowDown size={10} />)}
                                 </div>
                               </th>
                             </>
@@ -497,21 +497,22 @@ function Main() {
                           const diff = p.followers - sheetFollowers;
                           const hasSheetData = Object.keys(sheetData).length > 0;
 
-                          return (
+                           return (
                             <tr key={p.username} className="border-t border-slate-100 hover:bg-slate-50 transition-colors group">
                               <td className="p-4">
                                 <div className="flex items-center gap-3">
-                                  <img src={p.profilePic} className="w-10 h-10 rounded-full border border-slate-200" alt="" />
-                                  <div>
-                                    <div className="flex items-center gap-1">
-                                      <span className="text-sm font-bold text-slate-900">{p.displayName}</span>
-                                      {p.isVerified && <BadgeCheck size={12} className="text-blue-500" />}
-                                    </div>
-                                    <span className="text-xs text-slate-500">@{p.username}</span>
-                                  </div>
+                                  <img src={p.profilePic} className="w-8 h-8 rounded-full border border-slate-200" alt="" />
+                                  <a 
+                                    href={`https://instagram.com/${p.username}`} 
+                                    target="_blank" 
+                                    rel="noopener noreferrer"
+                                    className="text-xs font-mono text-cyan-600 hover:underline truncate max-w-[200px]"
+                                  >
+                                    instagram.com/{p.username}
+                                  </a>
                                 </div>
                               </td>
-                              <td className="p-4 font-display font-bold text-cyan-600">{formatCount(p.followers)}</td>
+                              <td className="p-4 font-display font-bold text-slate-900">{formatCount(p.followers)}</td>
                               {hasSheetData && (
                                 <>
                                   <td className="p-4 font-display font-bold text-slate-600">{formatCount(sheetFollowers)}</td>
