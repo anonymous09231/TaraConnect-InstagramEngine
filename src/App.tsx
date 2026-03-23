@@ -79,14 +79,17 @@ function Main() {
     retry: false,
   });
 
+  const inputOrder = useMemo(() => {
+    return bulkInputs ? bulkInputs.map(parseUsername) : [];
+  }, [bulkInputs]);
+
   const sortedBulk = useMemo(() => {
-    if (!bulkProfiles) return [];
+    if (!bulkProfiles || !Array.isArray(bulkProfiles)) return [];
     
-    if (sortKey === 'input' && bulkInputs) {
-      const inputOrder = bulkInputs.map(parseUsername);
+    if (sortKey === 'input' && inputOrder.length > 0) {
       const sorted = [...bulkProfiles].sort((a, b) => {
-        const indexA = inputOrder.indexOf(a.username.toLowerCase());
-        const indexB = inputOrder.indexOf(b.username.toLowerCase());
+        const indexA = inputOrder.indexOf((a.username || "").toLowerCase());
+        const indexB = inputOrder.indexOf((b.username || "").toLowerCase());
         const valA = indexA === -1 ? 999999 : indexA;
         const valB = indexB === -1 ? 999999 : indexB;
         return valA - valB;
@@ -102,7 +105,7 @@ function Main() {
       }
       return 0;
     });
-  }, [bulkProfiles, bulkInputs, sortKey, sortDir]);
+  }, [bulkProfiles, inputOrder, sortKey, sortDir]);
 
   const handleSearch = (e: FormEvent) => {
     e.preventDefault();
@@ -294,7 +297,20 @@ function Main() {
                 </div>
               )}
 
-              {bulkProfiles && (
+              {bulkLoading && (
+                <div className="flex flex-col items-center justify-center p-12 glass rounded-3xl border border-white/10">
+                  <Loader2 size={40} className="animate-spin text-cyan-500 mb-4" />
+                  <p className="text-slate-500 font-medium">Fetching profile data...</p>
+                </div>
+              )}
+
+              {bulkProfiles && bulkProfiles.length === 0 && !bulkLoading && !bulkErr && (
+                <div className="p-12 text-center glass rounded-3xl border border-white/10">
+                  <p className="text-slate-500">No profiles found for the provided inputs.</p>
+                </div>
+              )}
+
+              {bulkProfiles && bulkProfiles.length > 0 && (
                 <motion.div 
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
@@ -333,7 +349,10 @@ function Main() {
                         {sortedBulk.map((p, i) => (
                           <tr key={p.username} className="border-t border-slate-100 hover:bg-slate-50 transition-colors group">
                             <td className="p-4 text-xs font-mono text-slate-400">
-                              {bulkInputs ? bulkInputs.map(parseUsername).indexOf(p.username.toLowerCase()) + 1 : i + 1}
+                              {(() => {
+                                const idx = inputOrder.indexOf((p.username || "").toLowerCase());
+                                return idx === -1 ? "-" : idx + 1;
+                              })()}
                             </td>
                             <td className="p-4">
                               <div className="flex items-center gap-3">
