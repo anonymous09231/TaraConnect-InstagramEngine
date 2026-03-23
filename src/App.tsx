@@ -15,6 +15,7 @@ import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
 import { fetchProfile, fetchProfilesBulk, parseUsername } from './services/apifyService';
+import { fetchSheetData, SheetData } from './services/sheetService';
 import { InstagramProfile } from './types';
 
 function cn(...inputs: ClassValue[]) {
@@ -63,6 +64,11 @@ function Main() {
   const [bulkInputs, setBulkInputs] = useState<string[] | null>(null);
   const [sortKey, setSortKey] = useState<keyof InstagramProfile>("followers");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+  const [sheetData, setSheetData] = useState<Record<string, number>>({});
+  const [sheetRaw, setSheetRaw] = useState<SheetData[]>([]);
+  const [isSheetLoading, setIsSheetLoading] = useState(false);
+  const [showSheetModal, setShowSheetModal] = useState(false);
+  const [sheetError, setSheetError] = useState<string | null>(null);
 
   // Queries
   const { data: profile, isLoading: singleLoading, error: singleErr } = useQuery({
@@ -101,7 +107,51 @@ function Main() {
   const handleBulkSubmit = (e: FormEvent) => {
     e.preventDefault();
     const p = bulkRaw.split(/[\n,]+/).map(s => s.trim()).filter(Boolean);
-    if (p.length) setBulkInputs(p);
+    if (p.length) {
+      setBulkInputs(p);
+      setSheetData({}); // Clear sheet data if manual bulk
+    }
+  };
+
+  const handleSheetFetch = async () => {
+    setIsSheetLoading(true);
+    setSheetError(null);
+    try {
+      const data = await fetchSheetData();
+      if (!data || data.length === 0) {
+        throw new Error("No data found in the sheet. Please check your Google Apps Script.");
+      }
+      setSheetRaw(data);
+      
+      const sheetMap = data.reduce((acc, curr) => {
+        const username = curr.username || parseUsername(curr.url);
+        if (username) {
+          acc[username.toLowerCase()] = curr.followers;
+        }
+        return acc;
+      }, {} as Record<string, number>);
+      
+      setSheetData(sheetMap);
+      setShowSheetModal(true);
+    } catch (error) {
+      console.error("Sheet Fetch Error:", error);
+      setSheetError(error instanceof Error ? error.message : "Failed to fetch data from the sheet.");
+    } finally {
+      setIsSheetLoading(false);
+    }
+  };
+
+  const copySheetUrls = () => {
+    const urls = sheetRaw.map(d => d.url || d.username).filter(Boolean).join("\n");
+    navigator.clipboard.writeText(urls);
+    // Optional: add a toast notification
+  };
+
+  const populateBulkInput = () => {
+    const urls = sheetRaw.map(d => d.url || d.username).filter(Boolean).join("\n");
+    setBulkRaw(urls);
+    setMode('bulk');
+    setShowSheetModal(false);
   };
 
   return (
@@ -150,9 +200,73 @@ function Main() {
         >
           <List size={16} /> Bulk Lookup
         </button>
+        <button 
+          onClick={handleSheetFetch}
+          disabled={isSheetLoading}
+          className={cn(
+            "flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-semibold transition-all text-slate-500 hover:text-slate-900",
+            isSheetLoading && "opacity-50 cursor-not-allowed"
+          )}
+        >
+          {isSheetLoading ? <Loader2 size={16} className="animate-spin" /> : <ChevronRight size={16} />} 
+          Fetch from Sheets
+        </button>
       </div>
 
       <div className="w-full max-w-2xl">
+        <AnimatePresence>
+          {sheetError && (
+            <motion.div 
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              className="mb-8 p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 flex items-center gap-3"
+            >
+              <AlertCircle size={20} />
+              <p className="text-sm font-medium">{sheetError}</p>
+              <button onClick={() => setSheetError(null)} className="ml-auto">
+                <X size={16} />
+              </button>
+            </motion.div>
+          )}
+          
+          {showSheetModal && (
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="mb-8 p-6 glass rounded-3xl border border-cyan-500/30 bg-cyan-500/5"
+            >
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <BadgeCheck className="text-cyan-600" size={20} />
+                  <h3 className="font-display font-bold text-cyan-900">Sheet Data Loaded</h3>
+                </div>
+                <button onClick={() => setShowSheetModal(false)} className="text-slate-400 hover:text-slate-600">
+                  <X size={20} />
+                </button>
+              </div>
+              <p className="text-sm text-slate-600 mb-6">
+                Found {sheetRaw.length} profiles in the sheet. You can either copy the URLs or populate the bulk lookup input directly.
+              </p>
+              <div className="flex gap-3">
+                <button 
+                  onClick={populateBulkInput}
+                  className="flex-1 py-3 bg-cyan-600 text-white font-bold rounded-xl hover:bg-cyan-700 transition-all flex items-center justify-center gap-2"
+                >
+                  <List size={16} /> Populate Bulk Input
+                </button>
+                <button 
+                  onClick={copySheetUrls}
+                  className="px-6 py-3 bg-white border border-slate-200 text-slate-700 font-bold rounded-xl hover:bg-slate-50 transition-all flex items-center justify-center gap-2"
+                >
+                  <ExternalLink size={16} /> Copy URLs
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         <AnimatePresence mode="wait">
           {mode === 'single' ? (
             <motion.div 
@@ -300,29 +414,52 @@ function Main() {
                             }}
                           >
                             <div className="flex items-center gap-1">
-                              Followers {sortKey === 'followers' && (sortDir === 'asc' ? <ArrowUp size={10} /> : <ArrowDown size={10} />)}
+                              Live Followers {sortKey === 'followers' && (sortDir === 'asc' ? <ArrowUp size={10} /> : <ArrowDown size={10} />)}
                             </div>
                           </th>
+                          {Object.keys(sheetData).length > 0 && (
+                            <>
+                              <th className="p-4 text-[10px] font-bold uppercase tracking-widest text-slate-500">Sheet Followers</th>
+                              <th className="p-4 text-[10px] font-bold uppercase tracking-widest text-slate-500">Difference</th>
+                            </>
+                          )}
                         </tr>
                       </thead>
                       <tbody>
-                        {sortedBulk.map((p, i) => (
-                          <tr key={p.username} className="border-t border-slate-100 hover:bg-slate-50 transition-colors group">
-                            <td className="p-4">
-                              <div className="flex items-center gap-3">
-                                <img src={p.profilePic} className="w-10 h-10 rounded-full border border-slate-200" alt="" />
-                                <div>
-                                  <div className="flex items-center gap-1">
-                                    <span className="text-sm font-bold text-slate-900">{p.displayName}</span>
-                                    {p.isVerified && <BadgeCheck size={12} className="text-blue-500" />}
+                        {sortedBulk.map((p, i) => {
+                          const sheetFollowers = sheetData[p.username.toLowerCase()] || 0;
+                          const diff = p.followers - sheetFollowers;
+                          const hasSheetData = Object.keys(sheetData).length > 0;
+
+                          return (
+                            <tr key={p.username} className="border-t border-slate-100 hover:bg-slate-50 transition-colors group">
+                              <td className="p-4">
+                                <div className="flex items-center gap-3">
+                                  <img src={p.profilePic} className="w-10 h-10 rounded-full border border-slate-200" alt="" />
+                                  <div>
+                                    <div className="flex items-center gap-1">
+                                      <span className="text-sm font-bold text-slate-900">{p.displayName}</span>
+                                      {p.isVerified && <BadgeCheck size={12} className="text-blue-500" />}
+                                    </div>
+                                    <span className="text-xs text-slate-500">@{p.username}</span>
                                   </div>
-                                  <span className="text-xs text-slate-500">@{p.username}</span>
                                 </div>
-                              </div>
-                            </td>
-                            <td className="p-4 font-display font-bold text-cyan-600">{formatCount(p.followers)}</td>
-                          </tr>
-                        ))}
+                              </td>
+                              <td className="p-4 font-display font-bold text-cyan-600">{formatCount(p.followers)}</td>
+                              {hasSheetData && (
+                                <>
+                                  <td className="p-4 font-display font-bold text-slate-600">{formatCount(sheetFollowers)}</td>
+                                  <td className={cn(
+                                    "p-4 font-display font-bold",
+                                    diff > 0 ? "text-emerald-600" : diff < 0 ? "text-rose-600" : "text-slate-400"
+                                  )}>
+                                    {diff > 0 ? "+" : ""}{formatCount(diff)}
+                                  </td>
+                                </>
+                              )}
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>
