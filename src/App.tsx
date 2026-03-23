@@ -61,8 +61,8 @@ function Main() {
   const [searchInput, setSearchInput] = useState<string | null>(null);
   const [bulkRaw, setBulkRaw] = useState("");
   const [bulkInputs, setBulkInputs] = useState<string[] | null>(null);
-  const [sortKey, setSortKey] = useState<keyof InstagramProfile>("followers");
-  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+  const [sortKey, setSortKey] = useState<keyof InstagramProfile | 'input'>('input');
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
 
   // Queries
   const { data: profile, isLoading: singleLoading, error: singleErr } = useQuery({
@@ -81,15 +81,28 @@ function Main() {
 
   const sortedBulk = useMemo(() => {
     if (!bulkProfiles) return [];
+    
+    if (sortKey === 'input' && bulkInputs) {
+      const inputOrder = bulkInputs.map(parseUsername);
+      const sorted = [...bulkProfiles].sort((a, b) => {
+        const indexA = inputOrder.indexOf(a.username.toLowerCase());
+        const indexB = inputOrder.indexOf(b.username.toLowerCase());
+        const valA = indexA === -1 ? 999999 : indexA;
+        const valB = indexB === -1 ? 999999 : indexB;
+        return valA - valB;
+      });
+      return sortDir === 'asc' ? sorted : sorted.reverse();
+    }
+
     return [...bulkProfiles].sort((a, b) => {
-      const av = a[sortKey];
-      const bv = b[sortKey];
+      const av = a[sortKey as keyof InstagramProfile];
+      const bv = b[sortKey as keyof InstagramProfile];
       if (typeof av === 'number' && typeof bv === 'number') {
         return sortDir === 'asc' ? av - bv : bv - av;
       }
       return 0;
     });
-  }, [bulkProfiles, sortKey, sortDir]);
+  }, [bulkProfiles, bulkInputs, sortKey, sortDir]);
 
   const handleSearch = (e: FormEvent) => {
     e.preventDefault();
@@ -291,6 +304,17 @@ function Main() {
                     <table className="w-full text-left border-collapse">
                       <thead>
                         <tr className="bg-slate-50 border-b border-slate-200">
+                          <th 
+                            className="p-4 text-[10px] font-bold uppercase tracking-widest text-slate-500 cursor-pointer hover:text-slate-900 transition-colors"
+                            onClick={() => {
+                              if (sortKey === 'input') setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+                              else { setSortKey('input'); setSortDir('asc'); }
+                            }}
+                          >
+                            <div className="flex items-center gap-1">
+                              # {sortKey === 'input' && (sortDir === 'asc' ? <ArrowUp size={10} /> : <ArrowDown size={10} />)}
+                            </div>
+                          </th>
                           <th className="p-4 text-[10px] font-bold uppercase tracking-widest text-slate-500">Profile</th>
                           <th 
                             className="p-4 text-[10px] font-bold uppercase tracking-widest text-slate-500 cursor-pointer hover:text-slate-900 transition-colors"
@@ -308,6 +332,9 @@ function Main() {
                       <tbody>
                         {sortedBulk.map((p, i) => (
                           <tr key={p.username} className="border-t border-slate-100 hover:bg-slate-50 transition-colors group">
+                            <td className="p-4 text-xs font-mono text-slate-400">
+                              {bulkInputs ? bulkInputs.map(parseUsername).indexOf(p.username.toLowerCase()) + 1 : i + 1}
+                            </td>
                             <td className="p-4">
                               <div className="flex items-center gap-3">
                                 <img src={p.profilePic} className="w-10 h-10 rounded-full border border-slate-200" alt="" />
