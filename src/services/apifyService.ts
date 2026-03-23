@@ -31,49 +31,35 @@ async function waitForRun(runId: string): Promise<Record<string, unknown>> {
   throw new Error("Apify run timed out. Please try again.");
 }
 
-function mapItem(item: any, fallbackUsername = ""): InstagramProfile {
-  const uname = (item.username as string) || 
-                (item.ownerUsername as string) ||
-                (item.owner?.username as string) || 
-                (item.user?.username as string) || 
-                fallbackUsername;
-  
-  const displayName = (item.fullName as string) || 
-                      (item.full_name as string) || 
-                      (item.owner?.fullName as string) ||
-                      uname;
-
+function mapItem(item: Record<string, unknown>, fallbackUsername = ""): InstagramProfile {
+  const uname = (item.username as string) || fallbackUsername;
   return {
-    username: uname.toLowerCase(),
-    displayName: displayName,
-    bio: (item.biography as string) || (item.bio as string) || (item.description as string) || "",
+    username: uname,
+    displayName: (item.fullName as string) || (item.full_name as string) || uname,
+    bio: (item.biography as string) || (item.bio as string) || "",
     profilePic:
       (item.profilePicUrlHD as string) ||
       (item.profilePicUrl as string) ||
       (item.profile_pic_url_hd as string) ||
       (item.profile_pic_url as string) ||
-      (item.owner?.profilePicUrl as string) ||
       `https://ui-avatars.com/api/?name=${encodeURIComponent(uname)}&background=random&size=150`,
     followers:
       (item.followersCount as number) ||
       (item.followers_count as number) ||
-      (item.edge_followed_by?.count as number) ||
-      (item.user?.followers_count as number) ||
+      ((item.edge_followed_by as { count?: number })?.count) ||
       0,
     following:
       (item.followsCount as number) ||
       (item.follows_count as number) ||
-      (item.edge_follow?.count as number) ||
-      (item.user?.following_count as number) ||
+      ((item.edge_follow as { count?: number })?.count) ||
       0,
     posts:
       (item.postsCount as number) ||
       (item.posts_count as number) ||
-      (item.edge_owner_to_timeline_media?.count as number) ||
-      (item.user?.media_count as number) ||
+      ((item.edge_owner_to_timeline_media as { count?: number })?.count) ||
       0,
-    isVerified: Boolean(item.verified || item.is_verified || item.owner?.isVerified),
-    isPrivate: Boolean(item.isPrivate || item.is_private || item.owner?.isPrivate),
+    isVerified: Boolean(item.verified || item.is_verified),
+    isPrivate: Boolean(item.isPrivate || item.is_private),
     category: (item.businessCategoryName as string) || (item.category as string) || "",
     externalUrl: (item.externalUrl as string) || (item.external_url as string) || undefined,
   };
@@ -131,9 +117,5 @@ export async function fetchProfilesBulk(inputs: string[]): Promise<InstagramProf
   if (!dataRes.ok) throw new Error(`Failed to fetch bulk results (HTTP ${dataRes.status}).`);
 
   const items = (await dataRes.json()) as Record<string, unknown>[];
-  if (!Array.isArray(items)) return [];
-  
-  return items
-    .filter((item: any) => item && (item.username || item.ownerUsername || item.owner?.username))
-    .map((item: any) => mapItem(item));
+  return items.map((item) => mapItem(item));
 }
